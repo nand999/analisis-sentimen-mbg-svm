@@ -610,6 +610,150 @@ def show_main_dashboard(df):
         st.error(f"❌ File dataset '{dataset_path}' tidak ditemukan.")
     except Exception as e:
         st.error(f"❌ Error saat memuat dataset: {str(e)}")
+    
+    # Model Performance Section
+    st.markdown("---")
+    st.header("📊 Performa Model")
+    
+    try:
+        import json
+        with open('model_metrics.json', 'r') as f:
+            metrics = json.load(f)
+        
+        # Display key metrics
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("🎯 Accuracy", f"{metrics['accuracy']:.2%}")
+        with col2:
+            st.metric("📈 Precision (Weighted)", f"{metrics['classification_report']['weighted_avg']['precision']:.2%}")
+        with col3:
+            st.metric("📊 Recall (Weighted)", f"{metrics['classification_report']['weighted_avg']['recall']:.2%}")
+        with col4:
+            st.metric("⚖️ F1-Score (Weighted)", f"{metrics['classification_report']['weighted_avg']['f1-score']:.2%}")
+        
+        st.info(f"ℹ️ Model dilatih dengan rasio train:test = **{metrics['best_ratio']}**")
+        
+        # Confusion Matrix and Classification Report
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("🔢 Confusion Matrix")
+            
+            cm = metrics['confusion_matrix']
+            
+            # Create confusion matrix visualization using plotly
+            import plotly.figure_factory as ff
+            
+            z = [[cm['true_negative'], cm['false_positive']], 
+                 [cm['false_negative'], cm['true_positive']]]
+            
+            x = ['Prediksi Negatif', 'Prediksi Positif']
+            y = ['Aktual Negatif', 'Aktual Positif']
+            
+            z_text = [[f"TN: {cm['true_negative']}", f"FP: {cm['false_positive']}"],
+                      [f"FN: {cm['false_negative']}", f"TP: {cm['true_positive']}"]]
+            
+            fig = ff.create_annotated_heatmap(
+                z, 
+                x=x, 
+                y=y, 
+                annotation_text=z_text,
+                colorscale='Blues',
+                showscale=True
+            )
+            
+            fig.update_layout(
+                title="Confusion Matrix",
+                xaxis_title="Prediksi",
+                yaxis_title="Aktual",
+                height=400
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Explanation
+            st.markdown("""
+            **Penjelasan:**
+            - **TN (True Negative)**: Prediksi Negatif, Aktual Negatif ✅
+            - **TP (True Positive)**: Prediksi Positif, Aktual Positif ✅
+            - **FP (False Positive)**: Prediksi Positif, Aktual Negatif ❌ (Error Tipe I)
+            - **FN (False Negative)**: Prediksi Negatif, Aktual Positif ❌ (Error Tipe II)
+            """)
+        
+        with col2:
+            st.subheader("📋 Classification Report")
+            
+            # Create dataframe for classification report
+            report_data = []
+            
+            for label in ['negative', 'positive']:
+                label_name = 'Negatif' if label == 'negative' else 'Positif'
+                report_data.append({
+                    'Kelas': label_name,
+                    'Precision': f"{metrics['classification_report'][label]['precision']:.4f}",
+                    'Recall': f"{metrics['classification_report'][label]['recall']:.4f}",
+                    'F1-Score': f"{metrics['classification_report'][label]['f1-score']:.4f}"
+                })
+            
+            # Add weighted average
+            report_data.append({
+                'Kelas': 'Weighted Avg',
+                'Precision': f"{metrics['classification_report']['weighted_avg']['precision']:.4f}",
+                'Recall': f"{metrics['classification_report']['weighted_avg']['recall']:.4f}",
+                'F1-Score': f"{metrics['classification_report']['weighted_avg']['f1-score']:.4f}"
+            })
+            
+            report_df = pd.DataFrame(report_data)
+            st.dataframe(report_df, use_container_width=True, hide_index=True)
+            
+            # Metrics explanation
+            st.markdown("""
+            **Penjelasan Metrik:**
+            - **Precision**: Dari semua prediksi positif/negatif, berapa persen yang benar?
+            - **Recall**: Dari semua data aktual positif/negatif, berapa persen yang berhasil diprediksi?
+            - **F1-Score**: Harmonic mean dari Precision dan Recall (keseimbangan keduanya)
+            - **Weighted Avg**: Rata-rata tertimbang berdasarkan jumlah sampel per kelas
+            """)
+            
+            # Bar chart for metrics comparison
+            fig_metrics = go.Figure()
+            
+            # Map display names to JSON keys
+            metric_mapping = {
+                'Precision': 'precision',
+                'Recall': 'recall',
+                'F1-Score': 'f1-score'
+            }
+            
+            for metric_display, metric_key in metric_mapping.items():
+                values = [
+                    metrics['classification_report']['negative'][metric_key],
+                    metrics['classification_report']['positive'][metric_key]
+                ]
+                fig_metrics.add_trace(go.Bar(
+                    name=metric_display,
+                    x=['Negatif', 'Positif'],
+                    y=values,
+                    text=[f"{v:.2%}" for v in values],
+                    textposition='auto'
+                ))
+            
+            fig_metrics.update_layout(
+                title="Perbandingan Metrik per Kelas",
+                xaxis_title="Kelas",
+                yaxis_title="Score",
+                barmode='group',
+                height=350,
+                yaxis=dict(range=[0, 1])
+            )
+            
+            st.plotly_chart(fig_metrics, use_container_width=True)
+        
+    except FileNotFoundError:
+        st.warning("⚠️ File model_metrics.json tidak ditemukan. Jalankan sentiment_model.py terlebih dahulu untuk menghasilkan metrik performa model.")
+    except Exception as e:
+        st.error(f"❌ Error saat memuat metrik model: {str(e)}")
 
 def show_prediction_page(analyzer):
     """Halaman prediksi sentimen"""

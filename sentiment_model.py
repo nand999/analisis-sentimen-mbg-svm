@@ -399,6 +399,47 @@ def main():
     X_test_tfidf = analyzer.vectorizer.transform(X_test)
     # Training
     analyzer.model.fit(X_train_tfidf, y_train)
+    
+    # Calculate performance metrics for the best model
+    y_pred = analyzer.model.predict(X_test_tfidf)
+    accuracy = accuracy_score(y_test, y_pred)
+    cm = confusion_matrix(y_test, y_pred)
+    report = classification_report(y_test, y_pred, target_names=['Negatif', 'Positif'], output_dict=True)
+    
+    # Save performance metrics to JSON
+    import json
+    metrics = {
+        'best_ratio': best_ratio,
+        'accuracy': float(accuracy),
+        'confusion_matrix': {
+            'true_negative': int(cm[0][0]),
+            'false_positive': int(cm[0][1]),
+            'false_negative': int(cm[1][0]),
+            'true_positive': int(cm[1][1])
+        },
+        'classification_report': {
+            'negative': {
+                'precision': float(report['Negatif']['precision']),
+                'recall': float(report['Negatif']['recall']),
+                'f1-score': float(report['Negatif']['f1-score'])
+            },
+            'positive': {
+                'precision': float(report['Positif']['precision']),
+                'recall': float(report['Positif']['recall']),
+                'f1-score': float(report['Positif']['f1-score'])
+            },
+            'weighted_avg': {
+                'precision': float(report['weighted avg']['precision']),
+                'recall': float(report['weighted avg']['recall']),
+                'f1-score': float(report['weighted avg']['f1-score'])
+            }
+        }
+    }
+    
+    with open('model_metrics.json', 'w') as f:
+        json.dump(metrics, f, indent=4)
+    print("✓ Model metrics saved to model_metrics.json")
+    
     # Simpan model dengan rasio terbaik
     analyzer.save_model('sentiment_model.pkl')
     print(f"✓ Model dengan rasio {best_ratio} berhasil disimpan!")
